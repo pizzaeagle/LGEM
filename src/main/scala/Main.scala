@@ -1,51 +1,47 @@
 package mm.graph.embeddings
 
+import mm.graph.embeddings.graph.{IndexedNode, Relation}
+import mm.graph.embeddings.node2vec.{NodesNeighbourhood, RandomWalk, TripletWithAlias, TripletWithNeighbourhoods}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.ml.feature.Word2Vec
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.StringType
 
 object Main {
   def main(args: Array[String]): Unit = {
     import spark.implicits._
-    val rel = Seq((1,2),
-      (1,3),
-      (1,4),
-      (2,2),
-      (2,1),
-      (2,3),
-      (2,4),
-      (3,7),
-      (3,4),
-      (5,7),
-      (4,3),
-      (4,1),
-      (4,6),
-      (6,5),
-      (7,3)).toDF("start","dest")
-    val walk = rel.toDF("0","1")
 
-    val walks = (1 to 10).foldLeft(walk) { (walk, i) =>
-      val w = Window.partitionBy($"0").orderBy(rand(123))
-      walk.as("rel").join(rel, walk(i.toString) === rel("start"))
-        .drop(col("start"))
-        .withColumnRenamed("dest", (i+1).toString)
-        .withColumn("rn", row_number.over(w))
-        .where(col("rn") < 10)
-        .drop("rn")
-    }
-    println(walks.count)
-    walks.show(20)
-    val x = walks.select(array((0 to 10).map(i => col(i.toString).cast("string")):_*).as("walks"))
+    val degree = Some(3)
+    val p = 1
+    val q = 1
+    val walkLength = 10
+    val numWalks = 10
 
-    val word2vec = new Word2Vec().setInputCol("walks").fit(x)
+    val relDF = Relation.readUndirected(TestData.relations)
+//    val nodeDF = IndexedNode.read(TestData.nodes)
+    val nodesWithNeighbours = NodesNeighbourhood(relDF, degree)
+    val tripletWithNeighbourhoods = TripletWithNeighbourhoods(nodesWithNeighbours, relDF)
+    val aliasedTriplets = TripletWithAlias(p, q)(tripletWithNeighbourhoods)
+    aliasedTriplets.show(100,false)
+    val walkStart = RandomWalk.firstStep(numWalks)(nodesWithNeighbours)
+    val x = RandomWalk.randomWalks(walkLength)(walkStart, aliasedTriplets)
 
-    word2vec.getVectors.show()
+    val cols = Range(1, 11).map(x => col(s"walkStep$x").cast(StringType))
+    val rwalks = x.withColumn("randomWalk", array(cols:_*))
+    rwalks.show(false)
+    println(rwalks.count)
 
-    Thread.sleep(1000000)
+
+    // Learn a mapping from words to Vectors.
+    val word2Vec = new Word2Vec()
+      .setInputCol("randomWalk")
+      .setOutputCol("result")
+      .setVectorSize(10)
+      .setMinCount(0)
+    val model = word2Vec.fit(rwalks)
+
+    model.getVectors.show(100,false)
+
   }
-
-//  def randomWalk(relations: DataFrame): DataFrame = {
-//    relations.join()
-//  }
 }
