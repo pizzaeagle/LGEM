@@ -39,28 +39,6 @@ object RandomWalk {
       .withColumnRenamed("srcID", "rel_srcID")
       .withColumnRenamed("dstID", "rel_dstID")
 
-//    Range(1, walkLength - 1).foldLeft(walkStartDS){
-//      (walks, i) => {
-//        walks.where("srcId == 7 and walkNumber == 7").show(100, false)
-//        val x = walks
-//          .withColumn("stepStart", element_at(col("walk"), -2))
-//          .withColumn("stepEnd", element_at(col("walk"), -1))
-//          .join(relRDS, col("stepStart") === col("rel_srcID") and col("stepEnd") === col("rel_dstID"))
-//          .withColumn("walk", concat(col("walk"), array(element_at(col("dstNeighbourhood"), drawAliasUdf(col("j"), col("q")) + 1))))
-//          .withColumn("x", drawAliasUdf(col("j"), col("q")))
-//
-//        x.where("srcId == 7 and walkNumber == 7").show(100, false)
-//        x
-//          .select(
-//            col("srcId"),
-//            col("walkNumber"),
-//            col("walk")
-//          )
-//          .as[RandomWalk]
-//          .repartition(1)
-//      }
-//    }
-
     val df = walkStartDS
       .select(
         col("srcId"),
