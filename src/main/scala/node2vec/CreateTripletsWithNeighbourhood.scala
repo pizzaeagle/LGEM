@@ -7,15 +7,15 @@ import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 
-case class TripletWithNeighbourhoods(srcID: Long,
-                                     dstID: Long,
-                                     weight: Option[Double] = None,
-                                     srcNeighbourhood: Array[Neighbour],
-                                     dstNeighbourhood: Array[Neighbour])
+case class CreateTripletsWithNeighbourhood(srcID: Long,
+                                           dstID: Long,
+                                           weight: Option[Double] = None,
+                                           srcNeighbourhood: Array[Neighbour],
+                                           dstNeighbourhood: Array[Neighbour])
 
-object TripletWithNeighbourhoods {
-  def apply(nodes: Dataset[NodesNeighbourhood], rel: Dataset[Relation])
-           (implicit spark: SparkSession): Dataset[TripletWithNeighbourhoods] = {
+object CreateTripletsWithNeighbourhood {
+  def apply(nodes: Dataset[CollectNodesNeighbourhood], rel: Dataset[Relation])
+           (implicit spark: SparkSession): Dataset[CreateTripletsWithNeighbourhood] = {
     import spark.implicits._
     nodes.join(rel, nodes("nodeId") === rel("srcID"))
       .select(
@@ -31,7 +31,7 @@ object TripletWithNeighbourhoods {
         col("weight"),
         col("srcNeighbourhood"),
         col("neighbourhood").as("dstNeighbourhood")
-      ).distinct.as[TripletWithNeighbourhoods]
+      ).distinct.as[CreateTripletsWithNeighbourhood]
   }
 }
 

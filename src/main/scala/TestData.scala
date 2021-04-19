@@ -1,17 +1,22 @@
 package mm.graph.embeddings
 
-import graph.{IndexedNode, Relation}
+import graph.{Graph, Node, Relation}
+
+import org.apache.avro.Conversions.UUIDConversion
+
+import scala.util.Random
 
 object TestData {
+
   import spark.implicits._
 
-  val nodes = Seq(IndexedNode("1", 1),
-    IndexedNode("2", 2),
-    IndexedNode("3", 3),
-    IndexedNode("4", 4),
-    IndexedNode("5", 5),
-    IndexedNode("6", 6),
-    IndexedNode("7", 7)
+  val nodes = Seq(Node("1", 1, Seq(0.32, 0.25, 0.45)),
+    Node("2", 2, Seq(0.12, 0.94, 0.92)),
+    Node("3", 3, Seq(0.10, 0.23, 0.30)),
+    Node("4", 4, Seq(0.20, 0.71, 0.27)),
+    Node("5", 5, Seq(0.30, 0.34, 0.34)),
+    Node("6", 6, Seq(0.40, 0.56, 0.76)),
+    Node("7", 7, Seq(0.50, 0.98, 0.67))
   )
 
   val relations = Seq(Relation(1, 2),
@@ -29,6 +34,25 @@ object TestData {
     Relation(4, 6),
     Relation(6, 5),
     Relation(7, 3))
+
+  def testGraphGeneration(nodesNumber: Int, relationPerNode: Int, numberOfFeatures: Int) = {
+    val data = Range(0, nodesNumber).map { nodeID => {
+      val nodeName = java.util.UUID.randomUUID.toString
+      val features = Range(0, numberOfFeatures).map(_ => Random.nextDouble())
+      val node = Node(nodeName, nodeID, features)
+      val relations = Range(0, relationPerNode).map(_ => {
+        val neighbour = Math.abs(Random.nextLong()) % nodesNumber
+        Relation(nodeID, neighbour)
+      })
+      (node, relations)
+    }
+    }.foldLeft(Seq.empty[Node], Seq.empty[Relation]) {
+      (data, rel) => {
+        (data._1 :+ rel._1, data._2 ++ rel._2)
+      }
+    }
+    Graph.loadUndirectedGraphFromLocalData(data._1, data._2)
+  }
 }
 
 

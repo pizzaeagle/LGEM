@@ -7,7 +7,7 @@ import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.collection.mutable.ArrayBuffer
 
-case class TripletWithAlias(srcID: Long,
+case class CalculateAliases(srcID: Long,
                             dstID: Long,
                             srcNeighbourhood: Array[Long],
                             dstNeighbourhood: Array[Long],
@@ -15,9 +15,9 @@ case class TripletWithAlias(srcID: Long,
                             q: Array[Double])
 
 
-object TripletWithAlias{
-  def apply(p: Double = 1.0, q: Double = 1.0)(df: Dataset[TripletWithNeighbourhoods])
-           (implicit spark: SparkSession): Dataset[TripletWithAlias] = {
+object CalculateAliases{
+  def apply(p: Double = 1.0, q: Double = 1.0)(df: Dataset[CreateTripletsWithNeighbourhood])
+           (implicit spark: SparkSession): Dataset[CalculateAliases] = {
     import spark.implicits._
     df
       .withColumn("dstNeighbour", explode(col("dstNeighbourhood")))
@@ -43,7 +43,7 @@ object TripletWithAlias{
         col("dstNeighbourhood"),
         col("aliases.j").as("j"),
         col("aliases.q").as("q")
-      ).as[TripletWithAlias]
+      ).as[CalculateAliases]
       .repartition(1)
   }
 }

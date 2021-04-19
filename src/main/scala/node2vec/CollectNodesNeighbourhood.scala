@@ -1,17 +1,17 @@
 package mm.graph.embeddings
 package node2vec
 
-import mm.graph.embeddings.graph.{IndexedNode, Relation}
+import mm.graph.embeddings.graph.{Node, Relation}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 case class Neighbour(id: Long, weight: Double)
 
-case class NodesNeighbourhood(nodeId: Long, neighbourhood: Array[Neighbour])
+case class CollectNodesNeighbourhood(nodeId: Long, neighbourhood: Array[Neighbour])
 
 
-object NodesNeighbourhood {
-  def apply(relations: Dataset[Relation], degree: Option[Int])(implicit spark: SparkSession): Dataset[NodesNeighbourhood] = {
+object CollectNodesNeighbourhood {
+  def apply(relations: Dataset[Relation], degree: Option[Int] = None)(implicit spark: SparkSession): Dataset[CollectNodesNeighbourhood] = {
     import spark.implicits._
     degree match {
       case Some(d) => relations
@@ -22,7 +22,7 @@ object NodesNeighbourhood {
           col("srcID").as("nodeId"),
           col("neighbourhood")
         )
-        .as[NodesNeighbourhood]
+        .as[CollectNodesNeighbourhood]
       case None => relations
         .distinct
         .groupBy(col("srcID"))
@@ -31,7 +31,7 @@ object NodesNeighbourhood {
           col("srcID").as("nodeId"),
           col("neighbourhood")
         )
-        .as[NodesNeighbourhood]
+        .as[CollectNodesNeighbourhood]
     }
   }
 }

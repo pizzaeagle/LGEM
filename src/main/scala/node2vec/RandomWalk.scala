@@ -9,7 +9,7 @@ case class RandomWalk(srcId: Long, walkNumber: Int, walk: Seq[Long])
 
 
 object RandomWalk {
-  def firstStep(walkNumber: Int)(dataset: Dataset[NodesNeighbourhood])(implicit spark: SparkSession): Dataset[RandomWalk] = {
+  def firstStep(walkNumber: Int)(dataset: Dataset[CollectNodesNeighbourhood])(implicit spark: SparkSession): Dataset[RandomWalk] = {
     import spark.implicits._
     val df = dataset.withColumn("alias", setupAliasUdf(col("neighbourhood.weight")))
       .withColumnRenamed("nodeId", "srcId")
@@ -31,7 +31,7 @@ object RandomWalk {
     }
   }
 
-  def randomWalks(walkLength: Int)(walkStartDS: Dataset[RandomWalk], relDS: Dataset[TripletWithAlias])
+  def randomWalks(walkLength: Int)(walkStartDS: Dataset[RandomWalk], relDS: Dataset[CalculateAliases])
                  (implicit spark: SparkSession): DataFrame /*Dataset[RandomWalk] */ = {
     import spark.implicits._
 

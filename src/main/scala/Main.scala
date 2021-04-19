@@ -1,7 +1,7 @@
 package mm.graph.embeddings
 
-import mm.graph.embeddings.graph.{IndexedNode, Relation}
-import mm.graph.embeddings.node2vec.{NodesNeighbourhood, RandomWalk, TripletWithAlias, TripletWithNeighbourhoods}
+import mm.graph.embeddings.graph.{Node, Relation}
+import mm.graph.embeddings.node2vec.{CollectNodesNeighbourhood, RandomWalk, CalculateAliases, CreateTripletsWithNeighbourhood}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.ml.feature.Word2Vec
@@ -20,9 +20,9 @@ object Main {
 
     val relDF = Relation.readUndirected(TestData.relations)
 //    val nodeDF = IndexedNode.read(TestData.nodes)
-    val nodesWithNeighbours = NodesNeighbourhood(relDF, degree)
-    val tripletWithNeighbourhoods = TripletWithNeighbourhoods(nodesWithNeighbours, relDF)
-    val aliasedTriplets = TripletWithAlias(p, q)(tripletWithNeighbourhoods)
+    val nodesWithNeighbours = CollectNodesNeighbourhood(relDF, degree)
+    val tripletWithNeighbourhoods = CreateTripletsWithNeighbourhood(nodesWithNeighbours, relDF)
+    val aliasedTriplets = CalculateAliases(p, q)(tripletWithNeighbourhoods)
     aliasedTriplets.show(100,false)
     val walkStart = RandomWalk.firstStep(numWalks)(nodesWithNeighbours)
     val x = RandomWalk.randomWalks(walkLength)(walkStart, aliasedTriplets)
