@@ -6,18 +6,21 @@ import graph.Relation
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Dataset, SparkSession}
 
-
-case class CreateTripletsWithNeighbourhood(srcID: Long,
-                                           dstID: Long,
-                                           weight: Option[Double] = None,
-                                           srcNeighbourhood: Array[Neighbour],
-                                           dstNeighbourhood: Array[Neighbour])
+case class CreateTripletsWithNeighbourhood(
+  srcID: Long,
+  dstID: Long,
+  weight: Option[Double] = None,
+  srcNeighbourhood: Array[Neighbour],
+  dstNeighbourhood: Array[Neighbour]
+)
 
 object CreateTripletsWithNeighbourhood {
-  def apply(nodes: Dataset[CollectNodesNeighbourhood], rel: Dataset[Relation])
-           (implicit spark: SparkSession): Dataset[CreateTripletsWithNeighbourhood] = {
+  def apply(nodes: Dataset[CollectNodesNeighbourhood], rel: Dataset[Relation])(
+    implicit spark: SparkSession
+  ): Dataset[CreateTripletsWithNeighbourhood] = {
     import spark.implicits._
-    nodes.join(rel, nodes("nodeId") === rel("srcID"))
+    nodes
+      .join(rel, nodes("nodeId") === rel("srcID"))
       .select(
         col("srcID"),
         col("dstID"),
@@ -31,8 +34,8 @@ object CreateTripletsWithNeighbourhood {
         col("weight"),
         col("srcNeighbourhood"),
         col("neighbourhood").as("dstNeighbourhood")
-      ).distinct.as[CreateTripletsWithNeighbourhood]
+      )
+      .distinct
+      .as[CreateTripletsWithNeighbourhood]
   }
 }
-
-
