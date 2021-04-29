@@ -13,7 +13,7 @@ object RandomWalk {
   )(dataset: Dataset[CollectNodesNeighbourhood])(implicit spark: SparkSession): Dataset[RandomWalk] = {
     import spark.implicits._
     val df = dataset
-      .withColumn("alias", setupAliasUdf(col("neighbourhood.weight")))
+      .withColumn("alias", Alias.setupAliasUdf(col("neighbourhood.weight")))
       .withColumnRenamed("nodeId", "srcId")
     val walks = Seq.empty[RandomWalk].toDS
 
@@ -23,7 +23,7 @@ object RandomWalk {
           .withColumn("walkNumber", lit(i))
           .withColumn(
             "walk",
-            array(col("srcId"), col("neighbourhood.id")(drawAliasUdf(col("alias.j"), col("alias.q"))))
+            array(col("srcId"), col("neighbourhood.id")(Alias.drawAliasUdf(col("alias.j"), col("alias.q"))))
           )
           .select(
             col("srcId"),
@@ -56,7 +56,7 @@ object RandomWalk {
     Range(1, walkLength - 1).foldLeft(df) { (df, i) =>
       {
         df.join(relRDS, col(s"walkStep$i") === col("rel_srcID") and col(s"walkStep${i + 1}") === col("rel_dstID"))
-          .withColumn(s"walkStep${i + 2}", element_at(col("dstNeighbourhood"), drawAliasUdf(col("j"), col("q")) + 1))
+          .withColumn(s"walkStep${i + 2}", element_at(col("dstNeighbourhood"), Alias.drawAliasUdf(col("j"), col("q")) + 1))
           .drop("q", "j", "rel_srcID", "rel_dstID", "dstNeighbourhood", "srcNeighbourhood")
       }
     }

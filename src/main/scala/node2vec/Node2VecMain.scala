@@ -19,7 +19,6 @@ object Node2VecMain {
 
     val relDF =
       Relation.readUndirected(configuration.relationsInputDir)
-    //    val nodeDF = IndexedNode.read(TestData.nodes)
     val nodesWithNeighbours = CollectNodesNeighbourhood(relDF, degree)
     val tripletWithNeighbourhoods = CreateTripletsWithNeighbourhood(nodesWithNeighbours, relDF)
     val aliasedTriplets = CalculateAliases(p, q)(tripletWithNeighbourhoods)

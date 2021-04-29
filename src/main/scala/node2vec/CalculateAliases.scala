@@ -37,7 +37,7 @@ object CalculateAliases {
         col("dstNeighbourhood"),
         col("unormProbs")
       )
-      .withColumn("aliases", setupAliasUdf(col("unormProbs")))
+      .withColumn("aliases", Alias.setupAliasUdf(col("unormProbs")))
       .select(
         col("srcID"),
         col("dstID"),

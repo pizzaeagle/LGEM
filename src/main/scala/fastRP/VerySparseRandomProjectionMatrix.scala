@@ -27,13 +27,13 @@ object VerySparseRandomProjectionMatrix {
       .select(col("i").as("x"))
       .withColumn(
         "values",
-        explode(array(Range(0, size).map(i => struct(lit(i.toLong).as("i"), projection().as("val"))): _*))
+        explode(array(Range(0, size).map(i => struct(lit(i).as("i"), projection().as("val"))): _*))
       )
       .where("values.val != 0")
       .select("x", "values.i", "values.val")
       .rdd
       .map(
-        row => MatrixEntry(row.getLong(0), row.getLong(1), row.getDouble(2))
+        row => MatrixEntry(row.getInt(0), row.getInt(1), row.getDouble(2))
       )
-  ).toBlockMatrix().cache()
+  )
 }

@@ -4,6 +4,7 @@ package fastRP
 import mm.graph.embeddings.graph.Relation
 import org.apache.spark.mllib.linalg.distributed.{CoordinateMatrix, MatrixEntry}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
 object FastRPMain {
@@ -16,46 +17,93 @@ object FastRPMain {
     val indexedNodes = edges
       .select("srcID")
       .distinct
-      .rdd
-      .zipWithIndex
-      .map(
-        row => (row._1(0).asInstanceOf[Long], row._2)
-      )
+      .withColumn("i", row_number().over(Window.orderBy("srcID")))
+      .select("srcID", "i")
       .toDF("srcID", "i")
+      .repartition(200)
+      .cache
+
+    val distinctPairs = edges
+      .select("srcID", "dstID")
+      .distinct
+      .cache
 
     val reverseDegreeMatrix = new CoordinateMatrix(
-      edges
-        .select("srcID", "dstID")
-        .distinct
+      distinctPairs
         .groupBy("srcID")
         .agg(count(col("dstID")).as("count"))
         .join(indexedNodes, Seq("srcID"))
-        .select(col("srcID").cast("long"), col("count").cast("long"), col("i").cast("long"))
+        .select(col("count").cast("int"), col("i").cast("int"))
         .rdd
         .map(
-          row => MatrixEntry(row.getLong(2), row.getLong(2), 1.0 / row.getLong(1))
+          row => MatrixEntry(row.getInt(1), row.getInt(1), 1.0 / row.getInt(0))
         )
-    ).toBlockMatrix()
+    )
 
     val adjancencyMatrix = new CoordinateMatrix(
-      edges
-        .select("srcID", "dstID")
+      distinctPairs
         .join(indexedNodes, Seq("srcID"))
         .withColumnRenamed("i", "srcIndex")
         .select("srcID", "dstID", "srcIndex")
         .join(indexedNodes.as("d"), col("dstID") === col("d.srcID"))
         .withColumnRenamed("i", "dstIndex")
-        .select(col("srcIndex").cast("long"), col("dstIndex").cast("long"))
+        .select(col("srcIndex").cast("int"), col("dstIndex").cast("int"))
         .rdd
         .map(
-          row => MatrixEntry(row.getLong(0), row.getLong(1), 1)
+          row => MatrixEntry(row.getInt(0), row.getInt(1), 1)
         )
-    ).toBlockMatrix().cache()
+    )
 
-    val similarityMatrix = reverseDegreeMatrix.multiply(adjancencyMatrix)
+
+
+    edges.unpersist()
+    indexedNodes.unpersist()
+    distinctPairs.unpersist()
+    val similarityMatrix = coordinateMatrixMultiply(reverseDegreeMatrix,adjancencyMatrix)
     val verySparseRandomProjectionMatrix = VerySparseRandomProjectionMatrix.createMatrix(indexedNodes, 10)
-    val embeddings = Range(0, 10).foldLeft(verySparseRandomProjectionMatrix)((srp, _) => similarityMatrix.multiply(srp))
-    embeddings.toIndexedRowMatrix().rows.take(10).foreach(println)
-    embeddings.toIndexedRowMatrix().rows.toDF().write.mode("overwrite").csv(configuration.outputDir)
+    val alphas = Seq(0.3, 0.5, 0.7)
+    val embeddings = new CoordinateMatrix(
+      Seq(MatrixEntry(verySparseRandomProjectionMatrix.numRows(), verySparseRandomProjectionMatrix.numCols(), 0)).toDS.rdd)
+
+    val x = alphas.foldLeft((embeddings, verySparseRandomProjectionMatrix))(
+      (srp, alpha) => {
+        val m = coordinateMatrixMultiply(similarityMatrix,srp._2)
+        (coordinateMatrixAdd(coordinateMatrixMultiplyByScalar(m, alpha),srp._1), m)
+      }
+    )
+    x._1.toIndexedRowMatrix().rows.take(10).foreach(println)
+    x._1.entries.toDF().write.mode("overwrite").json("tmp_to_delete")
   }
+
+  def coordinateMatrixMultiply(leftMatrix: CoordinateMatrix, rightMatrix: CoordinateMatrix):
+  CoordinateMatrix = {
+    val M_ = leftMatrix.entries.map({ case MatrixEntry(i, j, v) => (j, (i, v)) })
+    val N_ = rightMatrix.entries.map({ case MatrixEntry(j, k, w) => (j, (k, w)) })
+
+    val productEntries = M_
+      .join(N_)
+      .map({ case (_, ((i, v), (k, w))) => ((i, k), (v * w)) })
+      .reduceByKey(_ + _)
+      .map({ case ((i, k), sum) => MatrixEntry(i, k, sum) })
+
+    new CoordinateMatrix(productEntries)
+  }
+
+  def coordinateMatrixMultiplyByScalar(matrix: CoordinateMatrix, scalar: Double): CoordinateMatrix =
+  {
+    new CoordinateMatrix(matrix.entries.map({ case MatrixEntry(i, j, v) => MatrixEntry(i, j, v * scalar) }))
+  }
+
+  def coordinateMatrixAdd(leftMatrix: CoordinateMatrix, rightMatrix: CoordinateMatrix):
+  CoordinateMatrix = {
+    val M_ = leftMatrix.entries.map({ case MatrixEntry(i1, j1, v1) => ((i1, j1), v1) })
+    val N_ = rightMatrix.entries.map({ case MatrixEntry(i1, j1, v1) => ((i1, j1), v1) })
+
+    val sumEntries = M_
+      .fullOuterJoin(N_)
+      .map({ case ((i,j), (v1, v2)) => MatrixEntry(i, j, v1.getOrElse(0.0) + v2.getOrElse(0.0)) })
+
+    new CoordinateMatrix(sumEntries)
+  }
+
 }

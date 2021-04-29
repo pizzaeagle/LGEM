@@ -27,16 +27,23 @@ object NodePair {
       .withColumn("linked", lit(true))
       .as[NodePair]
 
-//    val negative = g.edges.crossJoin(g.vertices.as("v"))
-//      .where(col("dstID") =!= col("nodeId"))
-//      .withColumn("row", row_number().over(w))
-//      .where(col("row") <= numSamples)
-//      .select(col("srcID").as("node1"),
-//        col("dstID").as("node2"))
-//      .withColumn("linked", lit(false))
-//      .as[NodePair]
-//    positive.union(negative)
-    positive
+    val count = g.vertices.count / 5
+    val agg = g.edges.groupBy("srcID").agg(collect_set(col("dstID")).as("dstIDs"))
+    val d = g.vertices
+      .withColumn("cluster", col("nodeId") % count)
+    val negative = d.as("y").join(d.as("x"), Seq("cluster"))
+        .select(
+          col("y.nodeID"),
+          col("x.nodeID").as("pair")
+        )
+        .join(agg, col("srcID") === col("nodeID"))
+        .where(col("srcID") =!= col("pair"))
+        .where(!array_contains(col("dstIDs"), col("pair")))
+        .select(col("srcID").as("node1"),
+          col("pair").as("node2"))
+        .withColumn("linked", lit(false))
+      .as[NodePair]
+    positive.union(negative)
   }
 
   def getNegativePairs(g: Graph, numSamples: Int)(implicit spark: SparkSession): Dataset[NodePair] = {
