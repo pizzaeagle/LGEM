@@ -19,13 +19,14 @@ object Alias {
     val larger = new ArrayBuffer[Int]()
 
     val sum = probs.sum
-    probs.zipWithIndex.foreach { case (weight, i) =>
-      q(i) = K * weight / sum
-      if (q(i) < 1.0) {
-        smaller.append(i)
-      } else {
-        larger.append(i)
-      }
+    probs.zipWithIndex.foreach {
+      case (weight, i) =>
+        q(i) = K * weight / sum
+        if (q(i) < 1.0) {
+          smaller.append(i)
+        } else {
+          larger.append(i)
+        }
     }
 
     while (smaller.nonEmpty && larger.nonEmpty) {
@@ -56,6 +57,6 @@ object Alias {
 
   def drawAliasUdf: UserDefinedFunction =
     udf((J: Seq[Int], q: Seq[Double]) => {
-      drawAlias(J,q)
+      drawAlias(J, q)
     })
 }
